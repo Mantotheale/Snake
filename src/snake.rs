@@ -1,6 +1,5 @@
-use glium::{implement_vertex, Display, Program, Surface, VertexBuffer};
+use glium::{implement_vertex, Display, IndexBuffer, Program, Surface, VertexBuffer};
 use glium::glutin::surface::WindowSurface;
-use glium::index::NoIndices;
 use crate::App;
 
 #[derive(Copy, Clone)]
@@ -13,7 +12,7 @@ implement_vertex!(Vertex, position, color);
 pub struct Snake {
     display: Display<WindowSurface>,
     vertex_buffer: VertexBuffer<Vertex>,
-    index_buffer: NoIndices,
+    index_buffer: IndexBuffer<u16>,
     shader: Program
 }
 
@@ -22,10 +21,17 @@ impl App for Snake {
         let vertices = vec![
             Vertex { position: [-0.5, -0.5], color: [0.0, 0.0, 1.0] },
             Vertex { position: [0.5, -0.5], color: [0.0, 0.0, 1.0] },
-            Vertex { position: [0.0, 0.5], color: [0.0, 0.0, 1.0] }
+            Vertex { position: [0.5, 0.5], color: [0.0, 0.0, 1.0] },
+            Vertex { position: [-0.5, 0.5], color: [0.0, 0.0, 1.0] },
         ];
         let vertex_buffer = VertexBuffer::new(&display, &vertices).unwrap();
-        let index_buffer = NoIndices(glium::index::PrimitiveType::TrianglesList);
+
+        let indices = vec![
+            0, 1, 3,
+            1, 2, 3
+        ];
+        let index_buffer =
+            IndexBuffer::new(&display, glium::index::PrimitiveType::TrianglesList, &indices).unwrap();
 
         let vertex_shader_src = r#"
             #version 330 core
