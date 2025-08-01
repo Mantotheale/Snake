@@ -1,10 +1,13 @@
-use glium::{Display, Surface};
+mod snake;
+
+use glium::Display;
 use glium::backend::glutin::SimpleWindowBuilder;
 use glium::glutin::surface::WindowSurface;
 use glium::winit::application::ApplicationHandler;
 use glium::winit::event::WindowEvent;
 use glium::winit::event_loop::{ActiveEventLoop, EventLoop};
 use glium::winit::window::{Window, WindowId};
+use crate::snake::Snake;
 
 pub trait App {
     fn new(display: Display<WindowSurface>) -> Self;
@@ -46,29 +49,6 @@ impl<T: App> ApplicationHandler for Engine<T> {
             },
             _ => {}
         }
-    }
-}
-
-struct Snake {
-    display: Display<WindowSurface>
-}
-
-impl App for Snake {
-    fn new(display: Display<WindowSurface>) -> Self {
-        Self {
-            display
-        }
-    }
-
-    fn update(&mut self) {
-    }
-
-    fn render(&mut self) {
-        let mut target = self.display.draw();
-
-        target.clear_color(0.0, 0.0, 0.0, 1.0);
-
-        target.finish().unwrap();
     }
 }
 
