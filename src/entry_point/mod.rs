@@ -1,4 +1,7 @@
 use std::time::{Duration, Instant};
+use glium::backend::glutin::SimpleWindowBuilder;
+use glium::{winit, Display};
+use glium::glutin::surface::WindowSurface;
 use winit::application::ApplicationHandler;
 use winit::event::WindowEvent;
 use winit::event_loop::{ActiveEventLoop, EventLoopProxy};
@@ -7,7 +10,7 @@ use winit::window::{Window, WindowAttributes, WindowId};
 const ONE_SEC_TIME: Duration = Duration::new(1, 0);
 
 pub trait App {
-    fn new(window: Window) -> Self;
+    fn new(window: Window, display: Display<WindowSurface>) -> Self;
     fn process_input(&mut self, input: WindowEvent);
     fn update(&mut self);
     fn one_sec_update(&mut self);
@@ -39,9 +42,11 @@ impl<T: App> EntryPoint<T> {
 
 impl<T: App> ApplicationHandler for EntryPoint<T> {
     fn resumed(&mut self, event_loop: &ActiveEventLoop) {
-        let window = event_loop.create_window(self.default_window_attributes.clone()).unwrap();
+        let (window, display) = SimpleWindowBuilder::new()
+            .set_window_builder(self.default_window_attributes.clone())
+            .build(event_loop);
 
-        self.app = Some(T::new(window));
+        self.app = Some(T::new(window, display));
 
         let current_time = Instant::now();
         self.next_update_time = Some(current_time + self.update_span);
