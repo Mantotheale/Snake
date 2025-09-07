@@ -1,4 +1,5 @@
 mod entry_point;
+mod input_manager;
 
 use std::default::Default;
 use std::time::{Duration, Instant};
@@ -7,12 +8,14 @@ use winit::event::WindowEvent;
 use winit::event_loop::EventLoop;
 use winit::window::{Window, WindowAttributes};
 use crate::entry_point::{App, EntryPoint};
+use crate::input_manager::InputManager;
 
 struct Snake {
     window: Window,
     update_count: u32,
     render_count: u32,
-    should_close: bool
+    should_close: bool,
+    input_manager: InputManager,
 }
 
 impl App for Snake {
@@ -21,16 +24,21 @@ impl App for Snake {
             window,
             update_count: 0,
             render_count: 0,
-            should_close: false
+            should_close: false,
+            input_manager: InputManager::new()
         }
     }
 
     fn process_input(&mut self, input: WindowEvent) {
+        if let WindowEvent::RedrawRequested = &input {
+            self.render();
+        }
+
         if let WindowEvent::CloseRequested = input {
             self.should_close = true;
         }
 
-        println!("{:?}", input);
+        self.input_manager.receive_input(input);
     }
 
     fn update(&mut self) {
@@ -44,6 +52,7 @@ impl App for Snake {
         self.update_count = 0;
         self.render_count = 0;
         println!("Time: {:?}", Instant::now());
+        println!("Mouse: {:?}", self.input_manager.cursor_position());
     }
 
     fn render(&mut self) {
@@ -64,8 +73,9 @@ fn main() {
 
     let wake_up = event_loop.create_proxy();
 
+    let update_time = 1f64 / 60f64;
     let mut entry_point = EntryPoint::<Snake>::new(
-        window_attributes, Duration::from_secs_f64(1f64 / 60f64),
+        window_attributes, Duration::from_secs_f64(update_time),
         wake_up
     );
 
