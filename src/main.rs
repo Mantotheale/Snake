@@ -1,10 +1,12 @@
 mod entry_point;
 mod input_manager;
 
+use glium::IndexBuffer;
+use std::rc::Rc;
 use std::time::{Duration, Instant};
-use glium::{implement_vertex, winit, Display, Program, Surface, VertexBuffer};
+use glium::{implement_vertex, uniform, winit, Display, Program, Surface, Texture2d, VertexBuffer};
 use glium::glutin::surface::WindowSurface;
-use glium::index::NoIndices;
+use glium::index::PrimitiveType::TrianglesList;
 use winit::dpi::PhysicalSize;
 use winit::event::WindowEvent;
 use winit::event_loop::EventLoop;
@@ -15,14 +17,40 @@ use crate::input_manager::InputManager;
 #[derive(Copy, Clone)]
 struct Vertex {
     position: [f32; 2],
+    tex_coords: [f32; 2]
 }
-implement_vertex!(Vertex, position);
+implement_vertex!(Vertex, position, tex_coords);
+
+#[derive(Clone)]
+struct Quad {
+    vertices: [Vertex; 4],
+    texture: Rc<Texture2d>
+}
+
+impl Quad {
+    pub fn new(texture: Rc<Texture2d>) -> Self {
+        Self {
+            vertices: [
+                Vertex { position: [-1.0, -1.0], tex_coords: [0.0, 0.0] },
+                Vertex { position: [ 1.0, -1.0], tex_coords: [1.0, 0.0] },
+                Vertex { position: [ 1.0,  1.0], tex_coords: [1.0, 1.0] },
+                Vertex { position: [ -1.0,  1.0], tex_coords: [0.0, 1.0] }
+            ],
+            texture
+        }
+    }
+
+    pub fn indices<'a>() -> &'a[u8] {
+        &[0, 1, 3, 1, 2, 3]
+    }
+}
 
 struct Snake {
     window: Window,
     display: Display<WindowSurface>,
     vertex_buffer: VertexBuffer<Vertex>,
-    indices: NoIndices,
+    quad: Quad,
+    indices: IndexBuffer<u8>,
     program: Program,
     update_count: u32,
     render_count: u32,
@@ -32,18 +60,26 @@ struct Snake {
 
 impl App for Snake {
     fn new(window: Window, display: Display<WindowSurface>) -> Self {
-        let vertex1 = Vertex { position: [-0.5, -0.5] };
-        let vertex2 = Vertex { position: [ 0.0,  0.5] };
-        let vertex3 = Vertex { position: [ 0.5, -0.25] };
-        let shape = vec![vertex1, vertex2, vertex3];
-        let vertex_buffer = glium::VertexBuffer::new(&display, &shape).unwrap();
-        let indices = glium::index::NoIndices(glium::index::PrimitiveType::TrianglesList);
+        let image = image::load(std::io::Cursor::new(&include_bytes!("../assets/images/dices.png")),
+                                image::ImageFormat::Png).unwrap().to_rgba8();
+        let image_dimensions = image.dimensions();
+        let image = glium::texture::RawImage2d::from_raw_rgba_reversed(&image.into_raw(), image_dimensions);
+        let texture = Rc::new(Texture2d::new(&display, image).unwrap());
+
+        let quad = Quad::new(texture);
+        let vertex_buffer = VertexBuffer::new(&display, &quad.vertices).unwrap();
+        let indices = IndexBuffer::new(&display, TrianglesList, Quad::indices()).unwrap();
+
         let vertex_shader_src = r#"
             #version 330
 
             in vec2 position;
+            in vec2 tex_coords;
+
+            out vec2 v_tex_coords;
 
             void main() {
+                v_tex_coords = tex_coords;
                 gl_Position = vec4(position, 0.0, 1.0);
             }
         "#;
@@ -52,19 +88,24 @@ impl App for Snake {
         let fragment_shader_src = r#"
             #version 330
 
+            in vec2 v_tex_coords;
+
             out vec4 color;
 
+            uniform sampler2D tex;
+
             void main() {
-                color = vec4(1.0, 0.0, 0.0, 1.0);
+                color = texture(tex, v_tex_coords);
             }
         "#;
 
-        let program = glium::Program::from_source(&display, vertex_shader_src, fragment_shader_src, None).unwrap();
+        let program = Program::from_source(&display, vertex_shader_src, fragment_shader_src, None).unwrap();
 
         Self {
             window,
             display,
             vertex_buffer,
+            quad,
             indices,
             program,
             update_count: 0,
@@ -107,8 +148,13 @@ impl App for Snake {
             &self.vertex_buffer,
             &self.indices,
             &self.program,
-            &glium::uniforms::EmptyUniforms,
-            &Default::default()
+            &uniform! {
+                tex: &*self.quad.texture
+            },
+            &glium::DrawParameters {
+                blend: glium::Blend::alpha_blending(),
+                ..Default::default()
+            }
         ).unwrap();
         target.finish().unwrap();
 
